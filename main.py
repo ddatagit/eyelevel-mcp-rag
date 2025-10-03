@@ -75,4 +75,4 @@ def ingest_documents(local_file_path: str, bucket_name: str) -> str:
                It should be available in a few minutes"""
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    mcp.run(transport="streamable-http")
