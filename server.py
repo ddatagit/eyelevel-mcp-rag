@@ -42,7 +42,7 @@ def search_doc_for_rag_context(query: str) -> str:
     return "\n\n".join(all_results) if all_results else "No relevant results found."
 
 @mcp.tool()
-def ingest_documents_via_path(local_file_path: str, bucket_name: str, file_type: str = "pdf") -> str:
+def ingest_documents(local_file_path: str, bucket_name: str, file_type: str = "pdf") -> str:
     """
     Ingest documents from a local file path into the knowledge base.
     Args:

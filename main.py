@@ -25,9 +25,8 @@ server_app.add_middleware(SlowAPIMiddleware)
 
 app.mount("/server", server_app)
 
-@app.get("/health")
-@limiter.limit("10/minute")
-async def health_check(request: Request):
+@app.get("/render-health-check")
+async def health_check():
   return {"status": 200, "message": "service is up"}
 
 if __name__ == "__main__":
