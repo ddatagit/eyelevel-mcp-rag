@@ -46,18 +46,38 @@ def ingest_documents(source: str, bucket_name: str, file_type: str = "pdf") -> s
     """
     Ingest documents from a local file path or remote URL into the knowledge base.
     Args:
-        source: The local file path or remote URL (starting with http:// or https://) to ingest.
+        source: The local file path or remote URL (from document_asset) to ingest.
         bucket_name: The name of the bucket to create and use for ingestion.
         file_type: The type of file being ingested (default: pdf).
     Returns:
         str: A message indicating the documents have been ingested.
     """
-    # Create bucket
-    bucket_response = client.buckets.create(name=bucket_name)
-    bucket_id = bucket_response.bucket.bucket_id
+    # Check if bucket exists, create if not
+    bucket_id = None
+    buckets_response = client.buckets.list()
 
-    # Determine file name
-    file_name = source.split("/")[-1] if "/" in source else os.path.basename(source)
+    if buckets_response.buckets:
+        for bucket in buckets_response.buckets:
+            if bucket.name == bucket_name:
+                bucket_id = bucket.bucket_id
+                break
+
+    if bucket_id is None:
+        bucket_response = client.buckets.create(name=bucket_name)
+        bucket_id = bucket_response.bucket.bucket_id
+
+    # Determine file name and path
+    # Check if source is a local file that exists
+    if os.path.exists(source):
+        file_name = os.path.basename(source)
+        file_path = source
+    else:
+        # If it's a path from Claude web upload (starts with /api/), add base URL
+        if source.startswith("/api/"):
+            file_path = f"https://claude.ai{source}"
+        else:
+            file_path = source
+        file_name = source.split("/")[-1]
 
     # Ingest document (works for both local files and remote URLs)
     client.ingest(
@@ -65,7 +85,7 @@ def ingest_documents(source: str, bucket_name: str, file_type: str = "pdf") -> s
             Document(
                 bucket_id=bucket_id,
                 file_name=file_name,
-                file_path=source,
+                file_path=file_path,
                 file_type=file_type,
                 search_data={"key": "value"}
             )
