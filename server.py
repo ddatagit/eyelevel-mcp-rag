@@ -1,4 +1,7 @@
 import os
+import base64
+import tempfile
+from typing import Optional
 from dotenv import load_dotenv
 from groundx import GroundX, Document
 from mcp.server.fastmcp import FastMCP
@@ -41,12 +44,13 @@ def search_doc_for_rag_context(query: str) -> str:
     return "\n\n".join(all_results) if all_results else "No relevant results found."
 
 @mcp.tool()
-def ingest_documents(local_file_path: str, bucket_name: str) -> str:
+def ingest_documents_via_path(local_file_path: str, bucket_name: str, file_type: str = "pdf") -> str:
     """
-    Ingest documents from a local file into the knowledge base.
+    Ingest documents from a local file path into the knowledge base.
     Args:
         local_file_path: The path to the local file containing the documents to ingest.
         bucket_name: The name of the bucket to create and use for ingestion.
+        file_type: The type of file being ingested (default: pdf).
     Returns:
         str: A message indicating the documents have been ingested.
     """
@@ -64,7 +68,7 @@ def ingest_documents(local_file_path: str, bucket_name: str) -> str:
             bucket_id=bucket_id,
             file_name=file_name,
             file_path=local_file_path,
-            file_type="pdf",
+            file_type=file_type,
             search_data=dict(
                 key = "value",
             ),
@@ -73,3 +77,52 @@ def ingest_documents(local_file_path: str, bucket_name: str) -> str:
     )
     return f"""Ingested {file_name} into the knowledge base (bucket: {bucket_name}, bucket_id: {bucket_id}).
                It should be available in a few minutes"""
+
+@mcp.tool()
+def ingest_documents_via_upload(
+    file_content_base64: str,
+    file_name: str,
+    bucket_name: str,
+    file_type: str = "pdf"
+) -> str:
+    """
+    Ingest documents uploaded from Claude (Web/Desktop) into the knowledge base.
+    Use this when a user uploads a file directly in the Claude interface.
+
+    Args:
+        file_content_base64: Base64-encoded file content from the uploaded file.
+        file_name: The name of the uploaded file.
+        bucket_name: The name of the bucket to upload to (will be created if doesn't exist).
+        file_type: The type of file being uploaded (e.g., pdf, txt, docx, etc.).
+
+    Returns:
+        str: A message indicating the file has been uploaded successfully.
+    """
+    # Create bucket
+    bucket_response = client.buckets.create(name=bucket_name)
+    bucket_id = bucket_response.bucket.bucket_id
+
+    # Decode base64 and save to temporary file
+    file_data = base64.b64decode(file_content_base64)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
+        temp_file.write(file_data)
+        temp_path = temp_file.name
+
+    try:
+        client.ingest(
+            documents=[
+                Document(
+                    bucket_id=bucket_id,
+                    file_name=file_name,
+                    file_path=temp_path,
+                    file_type=file_type,
+                    search_data=dict(key="value"),
+                )
+            ]
+        )
+        result = f"Successfully uploaded {file_name} to GroundX (bucket: {bucket_name}, bucket_id: {bucket_id}).\nThe file should be available for searching in a few minutes"
+    finally:
+        # Clean up temporary file
+        os.unlink(temp_path)
+
+    return result
