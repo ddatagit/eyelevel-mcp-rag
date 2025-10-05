@@ -1,6 +1,10 @@
 import contextlib
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from server import mcp as mcp_server
+
+limiter = Limiter(key_func=get_remote_address)
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -9,10 +13,21 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-app.mount("/server", mcp_server.streamable_http_app())
+app.state.limiter = limiter
+
+# Apply rate limiting to /server endpoint
+server_app = mcp_server.streamable_http_app()
+server_app.state.limiter = limiter
+
+# Wrap the server app with rate limiting middleware
+from slowapi.middleware import SlowAPIMiddleware
+server_app.add_middleware(SlowAPIMiddleware)
+
+app.mount("/server", server_app)
 
 @app.get("/health")
-async def health_check():
+@limiter.limit("10/minute")
+async def health_check(request: Request):
   return {"status": 200, "message": "service is up"}
 
 if __name__ == "__main__":
