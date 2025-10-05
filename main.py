@@ -5,7 +5,7 @@ from mcp.server.fastmcp import FastMCP
 
 load_dotenv()
 
-PORT:int = int(os.environ.get("PORT", 8000))
+PORT: int = int(os.getenv("PORT") or 8000)
 
 mcp = FastMCP("eyelevel-rag", port=PORT)
 client = GroundX(api_key=os.getenv("GROUNDX_API_KEY") or "")
