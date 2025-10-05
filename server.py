@@ -42,36 +42,34 @@ def search_doc_for_rag_context(query: str) -> str:
     return "\n\n".join(all_results) if all_results else "No relevant results found."
 
 @mcp.tool()
-def ingest_documents(local_file_path: str, bucket_name: str, file_type: str = "pdf") -> str:
+def ingest_documents(source: str, bucket_name: str, file_type: str = "pdf") -> str:
     """
-    Ingest documents from a local file path into the knowledge base.
+    Ingest documents from a local file path or remote URL into the knowledge base.
     Args:
-        local_file_path: The path to the local file containing the documents to ingest.
+        source: The local file path or remote URL (starting with http:// or https://) to ingest.
         bucket_name: The name of the bucket to create and use for ingestion.
         file_type: The type of file being ingested (default: pdf).
     Returns:
         str: A message indicating the documents have been ingested.
     """
-    # Check if bucket exists, create if not
-    bucket_id = None
+    # Create bucket
+    bucket_response = client.buckets.create(name=bucket_name)
+    bucket_id = bucket_response.bucket.bucket_id
 
-    if bucket_id is None:
-        bucket_response = client.buckets.create(name=bucket_name)
-        bucket_id = bucket_response.bucket.bucket_id
+    # Determine file name
+    file_name = source.split("/")[-1] if "/" in source else os.path.basename(source)
 
-    file_name = os.path.basename(local_file_path)
+    # Ingest document (works for both local files and remote URLs)
     client.ingest(
         documents=[
             Document(
-            bucket_id=bucket_id,
-            file_name=file_name,
-            file_path=local_file_path,
-            file_type=file_type,
-            search_data=dict(
-                key = "value",
-            ),
+                bucket_id=bucket_id,
+                file_name=file_name,
+                file_path=source,
+                file_type=file_type,
+                search_data={"key": "value"}
             )
         ]
     )
-    return f"""Ingested {file_name} into the knowledge base (bucket: {bucket_name}, bucket_id: {bucket_id}).
-               It should be available in a few minutes"""
+
+    return f"Ingested {file_name} into bucket '{bucket_name}' (ID: {bucket_id}). Available in a few minutes."
