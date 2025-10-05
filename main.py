@@ -9,7 +9,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-app.mount("/mcp", mcp_server.streamable_http_app())
+app.mount("/server", mcp_server.streamable_http_app())
 
 @app.get("/health")
 async def health_check():
